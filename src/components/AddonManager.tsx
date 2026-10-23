@@ -9,7 +9,12 @@ type Props = {
   onRunAddon: (addonPath: string) => void;
 };
 
-export default function AddonManager({ open, onClose, onCommandsLoaded, onRunAddon }: Props) {
+export default function AddonManager({
+  open,
+  onClose,
+  onCommandsLoaded,
+  onRunAddon,
+}: Props) {
   const [addons, setAddons] = useState<StudioAddon[]>([]);
   const [loaded, setLoaded] = useState<string[]>([]);
   const [status, setStatus] = useState<string | null>(null);
@@ -65,19 +70,29 @@ export default function AddonManager({ open, onClose, onCommandsLoaded, onRunAdd
   };
 
   const loadAddon = async (addon: StudioAddon) => {
+    if (
+      !window.confirm(
+        `Load ${addon.name} in the restricted .zph add-on runtime? Add-ons can use the editor command API, but file access, imports, and system shell access are disabled. The runtime has execution and output limits.`,
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     setError(null);
     setStatus(null);
     try {
       const result = await api.extensions.load(addon.path);
-      if (!result?.success) throw new Error(result?.error || "The add-on could not be loaded.");
+      if (!result?.success)
+        throw new Error(result?.error || "The add-on could not be loaded.");
       const commands = Array.isArray(result.commands) ? result.commands : [];
       onCommandsLoaded(addon.name, commands);
-      setLoaded((current) => (current.includes(addon.path) ? current : [...current, addon.path]));
+      setLoaded((current) =>
+        current.includes(addon.path) ? current : [...current, addon.path],
+      );
       setStatus(
         commands.length
           ? `${addon.name} loaded with ${commands.length} editor command${commands.length === 1 ? "" : "s"}.`
-          : `${addon.name} ran successfully and registered no editor commands.`
+          : `${addon.name} ran successfully and registered no editor commands.`,
       );
       if (result.output) setStatus((current) => `${current}\n${result.output}`);
     } catch (loadError) {
@@ -91,13 +106,23 @@ export default function AddonManager({ open, onClose, onCommandsLoaded, onRunAdd
 
   return (
     <div className="command-palette-backdrop" onClick={onClose}>
-      <div className="command-palette addon-manager" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="command-palette addon-manager"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="addon-manager-header">
           <div>
             <h2>Add-ons</h2>
-            <p>Install and run Zephra add-ons. Add-on code runs with your user permissions.</p>
+            <p>
+              Add-ons run in a restricted Zephra runtime. File access, imports,
+              and shell capabilities are disabled.
+            </p>
           </div>
-          <button className="addon-manager-close" onClick={onClose} aria-label="Close add-ons">
+          <button
+            className="addon-manager-close"
+            onClick={onClose}
+            aria-label="Close add-ons"
+          >
             ×
           </button>
         </div>
@@ -120,17 +145,35 @@ export default function AddonManager({ open, onClose, onCommandsLoaded, onRunAdd
                 <code>{addon.path}</code>
               </div>
               <div className="addon-card-actions">
-                <button className="toolbar-button" onClick={() => onRunAddon(addon.path)} disabled={busy}>
+                <button
+                  className="toolbar-button"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Run ${addon.name} in the restricted .zph add-on runtime? File access, imports, and system shell access are disabled.`,
+                      )
+                    ) {
+                      onRunAddon(addon.path);
+                    }
+                  }}
+                  disabled={busy}
+                >
                   Run
                 </button>
-                <button className="primary" onClick={() => loadAddon(addon)} disabled={busy}>
+                <button
+                  className="primary"
+                  onClick={() => loadAddon(addon)}
+                  disabled={busy}
+                >
                   {loaded.includes(addon.path) ? "Reload" : "Load"}
                 </button>
               </div>
             </div>
           ))}
           {addons.length === 0 && !error && (
-            <div className="addon-manager-empty">No add-ons found. Install a `.zph` add-on to get started.</div>
+            <div className="addon-manager-empty">
+              No add-ons found. Install a `.zph` add-on to get started.
+            </div>
           )}
         </div>
       </div>

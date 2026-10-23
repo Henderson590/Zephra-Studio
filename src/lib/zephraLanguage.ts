@@ -43,7 +43,7 @@ export function registerZephraLanguage(monaco: any) {
       "of",
       "switch",
       "case",
-      "default"
+      "default",
     ],
 
     typeKeywords: ["int", "float", "string", "bool", "void"],
@@ -66,11 +66,34 @@ export function registerZephraLanguage(monaco: any) {
       "listdir",
       "json_load",
       "json_dump",
-      "type_of"
+      "type_of",
     ],
 
     operators: [
-      "=", "+", "-", "*", "/", "%", "+=" , "-=" , "*=" , "/=", "%=", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!", "~", "^", "<<", ">>"
+      "=",
+      "+",
+      "-",
+      "*",
+      "/",
+      "%",
+      "+=",
+      "-=",
+      "*=",
+      "/=",
+      "%=",
+      "==",
+      "!=",
+      "<",
+      ">",
+      "<=",
+      ">=",
+      "&&",
+      "||",
+      "!",
+      "~",
+      "^",
+      "<<",
+      ">>",
     ],
 
     symbols: /[=><!~?:&|+\-*\/\^%]+/,
@@ -78,15 +101,18 @@ export function registerZephraLanguage(monaco: any) {
     tokenizer: {
       root: [
         // identifiers and keywords
-        [/[a-zA-Z_][\w]*/, {
-          cases: {
-            "@keywords": "keyword",
-            "@typeKeywords": "type",
-            "@builtins": "predefined",
-            "true|false|null": "keyword",
-            "@default": "identifier"
-          }
-        }],
+        [
+          /[a-zA-Z_][\w]*/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@typeKeywords": "type",
+              "@builtins": "predefined",
+              "true|false|null": "keyword",
+              "@default": "identifier",
+            },
+          },
+        ],
 
         // whitespace
         { include: "whitespace" },
@@ -94,12 +120,15 @@ export function registerZephraLanguage(monaco: any) {
         // delimiters and operators
         [/[{}()[\]]/, "delimiter"],
         [/[,.]/, "delimiter"],
-        [/@symbols/, {
-          cases: {
-            "@operators": "operator",
-            "@default": "" 
-          }
-        }],
+        [
+          /@symbols/,
+          {
+            cases: {
+              "@operators": "operator",
+              "@default": "",
+            },
+          },
+        ],
 
         // numbers
         [/(\d*\.)?\d+([eE][\-+]?\d+)?/, "number"],
@@ -108,56 +137,60 @@ export function registerZephraLanguage(monaco: any) {
         [/'([^'\\]|\\.)*$/, "string.invalid"],
         [/'/, { token: "string.quote", next: "string" }],
         [/"([^"\\]|\\.)*$/, "string.invalid"],
-        [/"/, { token: "string.quote", next: "string" }]
+        [/"/, { token: "string.quote", next: "string" }],
       ],
 
       whitespace: [
         [/[ \t\r\n]+/, ""],
         [/\/\/.*$/, "comment"],
-        [/\/\*/, "comment", "comment"]
+        [/\/\*/, "comment", "comment"],
       ],
 
       comment: [
         [/[\/*]/, "comment"],
         [/[\*]\//, "comment", "@pop"],
-        [/[^\/*]+/, "comment"]
+        [/[^\/*]+/, "comment"],
       ],
 
       string: [
         [/[^\\"]+/, "string"],
         [/\\./, "string.escape"],
         [/"/, { token: "string.quote", next: "@pop" }],
-        [/'/, { token: "string.quote", next: "@pop" }]
-      ]
-    }
+        [/'/, { token: "string.quote", next: "@pop" }],
+      ],
+    },
   });
 
   monaco.languages.setLanguageConfiguration(zephraLanguageId, {
     comments: {
       lineComment: "//",
-      blockComment: ["/*", "*/"]
+      blockComment: ["/*", "*/"],
     },
-    brackets: [["{", "}"], ["[", "]"], ["(", ")"]],
+    brackets: [
+      ["{", "}"],
+      ["[", "]"],
+      ["(", ")"],
+    ],
     autoClosingPairs: [
       { open: "{", close: "}" },
       { open: "[", close: "]" },
       { open: "(", close: ")" },
-      { open: "\"", close: "\"" },
-      { open: "'", close: "'" }
+      { open: '"', close: '"' },
+      { open: "'", close: "'" },
     ],
     surroundingPairs: [
       { open: "{", close: "}" },
       { open: "[", close: "]" },
       { open: "(", close: ")" },
-      { open: "\"", close: "\"" },
-      { open: "'", close: "'" }
+      { open: '"', close: '"' },
+      { open: "'", close: "'" },
     ],
     folding: {
       markers: {
         start: /^\s*\/\*\s*#?region\b/, // region markers
-        end: /^\s*\/\*\s*#?endregion\b/
-      }
-    }
+        end: /^\s*\/\*\s*#?endregion\b/,
+      },
+    },
   });
 }
 
@@ -174,6 +207,14 @@ export function detectLanguageFromPath(filePath: string) {
     case "ts":
     case "tsx":
       return "typescript";
+    case "java":
+      return "java";
+    case "gradle":
+      return "groovy";
+    case "kts":
+      return "kotlin";
+    case "cs":
+      return "csharp";
     case "py":
       return "python";
     case "cpp":
@@ -182,6 +223,10 @@ export function detectLanguageFromPath(filePath: string) {
     case "h":
     case "hpp":
       return "cpp";
+    case "rs":
+      return "rust";
+    case "go":
+      return "go";
     case "html":
       return "html";
     case "css":

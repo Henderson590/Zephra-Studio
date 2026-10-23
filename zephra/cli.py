@@ -37,7 +37,7 @@ def run_file(path: Path, config: ZephraConfig, verbose: bool) -> None:
 
 
 def run_studio_addon(path: Path, config: ZephraConfig, verbose: bool) -> None:
-    interpreter = Interpreter(config=config, verbose=verbose)
+    interpreter = Interpreter(config=config, verbose=verbose, sandboxed=True)
     interpreter.current_dir = path.parent
 
     try:

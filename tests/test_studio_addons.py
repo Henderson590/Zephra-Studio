@@ -58,6 +58,62 @@ class StudioAddonTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "action must be"):
             run_source('studio_command("unknown", "Unknown", "execute", "value");')
 
+    def test_rejects_invalid_command_ids_and_oversized_fields(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "command ID"):
+            run_source('studio_command("../escape", "Label", "notify", "value");')
+        with self.assertRaisesRegex(RuntimeError, "label cannot exceed"):
+            run_source(
+                f'studio_command("valid.id", "{"x" * 101}", "notify", "value");'
+            )
+        with self.assertRaisesRegex(RuntimeError, "value cannot exceed"):
+            run_source(
+                f'studio_command("valid.id", "Label", "notify", "{"x" * 10001}");'
+            )
+
+    def test_caps_registered_commands(self) -> None:
+        source = "".join(
+            f'studio_command("command.{index}", "Command {index}", "notify", "");'
+            for index in range(101)
+        )
+        with self.assertRaisesRegex(RuntimeError, "more than 100 commands"):
+            run_source(source)
+
+    def test_sandbox_disables_file_access_and_imports(self) -> None:
+        interpreter = Interpreter(
+            config=ZephraConfig(project_root=Path.cwd()), sandboxed=True
+        )
+        with self.assertRaisesRegex(RuntimeError, "Undefined variable 'read_file'"):
+            interpreter.interpret(
+                Parser(Lexer('read_file("secret.txt");').tokenize()).parse()
+            )
+        with self.assertRaisesRegex(RuntimeError, "Imports are disabled"):
+            interpreter.interpret(
+                Parser(Lexer('import "helper.zph";').tokenize()).parse()
+            )
+
+    def test_sandbox_enforces_execution_step_limit(self) -> None:
+        interpreter = Interpreter(
+            config=ZephraConfig(project_root=Path.cwd()),
+            sandboxed=True,
+            step_limit=20,
+        )
+        source = "while (true) { }"
+        with self.assertRaisesRegex(RuntimeError, "execution step limit"):
+            interpreter.interpret(Parser(Lexer(source).tokenize()).parse())
+
+    def test_sandbox_blocks_python_object_introspection_and_large_strings(self) -> None:
+        interpreter = Interpreter(
+            config=ZephraConfig(project_root=Path.cwd()), sandboxed=True
+        )
+        with self.assertRaisesRegex(RuntimeError, "property access is disabled"):
+            interpreter.interpret(
+                Parser(Lexer("print.name;").tokenize()).parse()
+            )
+        with self.assertRaisesRegex(RuntimeError, "string size limit"):
+            interpreter.interpret(
+                Parser(Lexer('"x" * 1000001;').tokenize()).parse()
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

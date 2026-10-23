@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -133,7 +134,13 @@ class Interpreter:
     extensibility hooks for builtins and modules.
     """
 
-    def __init__(self, config: ZephraConfig | None = None, verbose: bool = False) -> None:
+    def __init__(
+        self,
+        config: ZephraConfig | None = None,
+        verbose: bool = False,
+        sandboxed: bool = False,
+        step_limit: int = 100_000,
+    ) -> None:
         self.config = config or ZephraConfig.load()
         self.verbose = verbose
         self.globals = Environment()
@@ -141,22 +148,23 @@ class Interpreter:
         self.call_stack: List[str] = []
         self.module_cache: Dict[str, Any] = {}
         self.studio_commands: List[Dict[str, str]] = []
+        self.sandboxed = sandboxed
+        self.step_limit = step_limit
+        self.execution_steps = 0
+        self.max_sandbox_string_length = 1_000_000
+        self.max_sandbox_integer_bits = 4096
 
         # Base directory for resolving relative imports.
         self.current_dir: Path = Path(self.config.project_root)
 
         self._define_builtins()
 
-        # Load standard library and plugins if enabled.
-        try:
+        if not self.sandboxed:
             from .standard_lib import register_standard_library
             from .extensions import load_plugins
 
             register_standard_library(self)
             load_plugins(self, self.config)
-        except Exception:
-            # Avoid breaking core interpreter if optional subsystems fail.
-            pass
 
     # Runtime helpers
     def log(self, message: str) -> None:
@@ -184,32 +192,33 @@ class Interpreter:
 
     def _define_builtins(self) -> None:
         self.globals.define("print", ZephraBuiltin("print", lambda *args: print(*[_stringify(x) for x in args]), -1))
-        self.globals.define("input", ZephraBuiltin("input", lambda prompt="": input(str(prompt)), -1))
         self.globals.define("len", ZephraBuiltin("len", lambda x: len(x), 1))
-        self.globals.define(
-            "read_file",
-            ZephraBuiltin(
+        if not self.sandboxed:
+            self.globals.define("input", ZephraBuiltin("input", lambda prompt="": input(str(prompt)), -1))
+            self.globals.define(
                 "read_file",
-                lambda path: open(str(path), "r", encoding="utf-8").read(),
-                1,
-            ),
-        )
-        self.globals.define(
-            "write_file",
-            ZephraBuiltin(
+                ZephraBuiltin(
+                    "read_file",
+                    lambda path: open(str(path), "r", encoding="utf-8").read(),
+                    1,
+                ),
+            )
+            self.globals.define(
                 "write_file",
-                lambda path, data: open(str(path), "w", encoding="utf-8").write(str(data)),
-                2,
-            ),
-        )
-        self.globals.define(
-            "append_file",
-            ZephraBuiltin(
+                ZephraBuiltin(
+                    "write_file",
+                    lambda path, data: open(str(path), "w", encoding="utf-8").write(str(data)),
+                    2,
+                ),
+            )
+            self.globals.define(
                 "append_file",
-                lambda path, data: open(str(path), "a", encoding="utf-8").write(str(data)),
-                2,
-            ),
-        )
+                ZephraBuiltin(
+                    "append_file",
+                    lambda path, data: open(str(path), "a", encoding="utf-8").write(str(data)),
+                    2,
+                ),
+            )
         self.register_builtin("studio_command", self._register_studio_command, 4)
 
     def _register_studio_command(self, command_id: Any, label: Any, action: Any, value: Any) -> None:
@@ -217,10 +226,20 @@ class Interpreter:
             raise RuntimeError("studio_command expects four string arguments.")
         if not command_id.strip() or not label.strip():
             raise RuntimeError("studio_command requires a non-empty ID and label.")
+        if len(command_id) > 80 or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", command_id):
+            raise RuntimeError(
+                "studio_command ID must be at most 80 characters and use letters, numbers, periods, underscores, or hyphens."
+            )
+        if len(label) > 100:
+            raise RuntimeError("studio_command label cannot exceed 100 characters.")
+        if len(value) > 10000:
+            raise RuntimeError("studio_command value cannot exceed 10000 characters.")
         if action not in {"notify", "insert_text", "run_current_file"}:
             raise RuntimeError(
                 "studio_command action must be 'notify', 'insert_text', or 'run_current_file'."
             )
+        if len(self.studio_commands) >= 100:
+            raise RuntimeError("An add-on cannot register more than 100 commands.")
         if any(command["id"] == command_id for command in self.studio_commands):
             raise RuntimeError(f"Duplicate Studio command ID '{command_id}'.")
         self.studio_commands.append(
@@ -241,11 +260,19 @@ class Interpreter:
             raise RuntimeError(str(error), stack=self._build_stack_trace()) from error
 
     def _execute(self, stmt: Node) -> None:
+        self._consume_sandbox_step()
         method = f"_execute_{type(stmt).__name__}"
         if hasattr(self, method):
             getattr(self, method)(stmt)
         else:
             raise RuntimeError(f"Unknown statement type: {type(stmt).__name__}")
+
+    def _consume_sandbox_step(self) -> None:
+        if not self.sandboxed:
+            return
+        self.execution_steps += 1
+        if self.execution_steps > self.step_limit:
+            raise RuntimeError("Add-on exceeded its execution step limit.")
 
     def _evaluate(self, expr: Node) -> Any:
         method = f"_evaluate_{type(expr).__name__}"
@@ -269,6 +296,8 @@ class Interpreter:
         self._evaluate(stmt.expression)
 
     def _execute_ImportStmt(self, stmt: "ImportStmt") -> None:
+        if self.sandboxed:
+            raise RuntimeError("Imports are disabled in the add-on sandbox.")
         # Import a module via a file path or module name.
         from .modules import load_module
 
@@ -299,7 +328,10 @@ class Interpreter:
             self._execute_block(stmt.else_branch, Environment(self.environment))
 
     def _execute_WhileStmt(self, stmt: WhileStmt) -> None:
-        while _is_truthy(self._evaluate(stmt.condition)):
+        while True:
+            self._consume_sandbox_step()
+            if not _is_truthy(self._evaluate(stmt.condition)):
+                break
             try:
                 self._execute_block(stmt.body, Environment(self.environment))
             except BreakException:
@@ -311,6 +343,7 @@ class Interpreter:
         if stmt.initializer is not None:
             self._execute(stmt.initializer)
         while True:
+            self._consume_sandbox_step()
             if stmt.condition is not None and not _is_truthy(self._evaluate(stmt.condition)):
                 break
             try:
@@ -329,6 +362,13 @@ class Interpreter:
         raise ContinueException()
 
     def _evaluate_Literal(self, expr: Literal) -> Any:
+        self._check_sandbox_number(expr.value)
+        if (
+            self.sandboxed
+            and isinstance(expr.value, str)
+            and len(expr.value) > self.max_sandbox_string_length
+        ):
+            raise RuntimeError("Add-on exceeded its string size limit.")
         return expr.value
 
     def _evaluate_Variable(self, expr: Variable) -> Any:
@@ -346,16 +386,54 @@ class Interpreter:
 
         if op == "+":
             if isinstance(left, str) or isinstance(right, str):
+                if self.sandboxed and (
+                    len(_stringify(left)) + len(_stringify(right))
+                    > self.max_sandbox_string_length
+                ):
+                    raise RuntimeError("Add-on exceeded its string size limit.")
                 return _stringify(left) + _stringify(right)
-            return left + right
+            result = left + right
+            self._check_sandbox_number(result)
+            return result
         if op == "-":
-            return left - right
+            result = left - right
+            self._check_sandbox_number(result)
+            return result
         if op == "*":
-            return left * right
+            if self.sandboxed:
+                if isinstance(left, str) and isinstance(right, int):
+                    if len(left) * max(0, right) > self.max_sandbox_string_length:
+                        raise RuntimeError("Add-on exceeded its string size limit.")
+                if isinstance(right, str) and isinstance(left, int):
+                    if len(right) * max(0, left) > self.max_sandbox_string_length:
+                        raise RuntimeError("Add-on exceeded its string size limit.")
+                if isinstance(left, str) and isinstance(right, float):
+                    if right.is_integer():
+                        if (
+                            len(left) * max(0, int(right))
+                            > self.max_sandbox_string_length
+                        ):
+                            raise RuntimeError("Add-on exceeded its string size limit.")
+                        right = int(right)
+                if isinstance(right, str) and isinstance(left, float):
+                    if left.is_integer():
+                        if (
+                            len(right) * max(0, int(left))
+                            > self.max_sandbox_string_length
+                        ):
+                            raise RuntimeError("Add-on exceeded its string size limit.")
+                        left = int(left)
+            result = left * right
+            self._check_sandbox_number(result)
+            return result
         if op == "/":
-            return left / right
+            result = left / right
+            self._check_sandbox_number(result)
+            return result
         if op == "%":
-            return left % right
+            result = left % right
+            self._check_sandbox_number(result)
+            return result
         if op == "==":
             return _is_equal(left, right)
         if op == "!=":
@@ -411,9 +489,17 @@ class Interpreter:
             if expr.name in obj:
                 return obj[expr.name]
             raise RuntimeError(f"Property '{expr.name}' not found on module.")
+        if self.sandboxed:
+            raise RuntimeError("Object property access is disabled in the add-on sandbox.")
         if hasattr(obj, expr.name):
             return getattr(obj, expr.name)
         raise RuntimeError(f"Cannot access property '{expr.name}' on value.")
+
+    def _check_sandbox_number(self, value: Any) -> None:
+        if not self.sandboxed:
+            return
+        if isinstance(value, int) and value.bit_length() > self.max_sandbox_integer_bits:
+            raise RuntimeError("Add-on exceeded its numeric value limit.")
 
 
 def interpret(program: Program) -> None:
