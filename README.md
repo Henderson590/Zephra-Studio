@@ -149,7 +149,7 @@ folder while developing Zephra Studio.
 
 ---
 
-## 🧷 Notes
+## 🧷Notes
 
 - The IDE requires Python to be installed and available on the system PATH.
 - The project is designed to be extensible and can be enhanced with features like full debugging, git integration, LSP support, and more.
