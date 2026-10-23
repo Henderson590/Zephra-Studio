@@ -28,7 +28,6 @@ class StudioAddonTests(unittest.TestCase):
             'studio_command("hello.greet", "Say hello", "notify", "Hello!");'
             'studio_command("hello.insert", "Insert text", "insert_text", "// hello");'
         )
-
         self.assertEqual(
             interpreter.studio_commands,
             [
@@ -46,6 +45,69 @@ class StudioAddonTests(unittest.TestCase):
                 },
             ],
         )
+
+    def test_registers_custom_views_and_requested_permissions_in_sandbox(self) -> None:
+        interpreter = Interpreter(
+            config=ZephraConfig(project_root=Path.cwd()), sandboxed=True
+        )
+        source = (
+            'studio_permission("workspace.read");'
+            'studio_permission("ui.notify");'
+            'studio_view("browser", "Project Browser", "<h1>Hello</h1>");'
+        )
+        interpreter.interpret(Parser(Lexer(source).tokenize()).parse())
+
+        self.assertEqual(
+            interpreter.studio_permissions, ["workspace.read", "ui.notify"]
+        )
+        self.assertEqual(
+            interpreter.studio_views,
+            [
+                {
+                    "id": "browser",
+                    "label": "Project Browser",
+                    "html": "<h1>Hello</h1>",
+                }
+            ],
+        )
+        self.assertEqual(
+            interpreter.studio_commands,
+            [
+                {
+                    "id": "view.browser",
+                    "label": "Open Project Browser",
+                    "action": "open_view",
+                    "value": "browser",
+                }
+            ],
+        )
+
+    def test_rejects_unsupported_addon_permissions_and_invalid_views(self) -> None:
+        interpreter = Interpreter(
+            config=ZephraConfig(project_root=Path.cwd()), sandboxed=True
+        )
+        with self.assertRaisesRegex(RuntimeError, "Unsupported Studio add-on permission"):
+            interpreter.interpret(
+                Parser(Lexer('studio_permission("system.shell");').tokenize()).parse()
+            )
+        with self.assertRaisesRegex(RuntimeError, "Studio view ID"):
+            interpreter.interpret(
+                Parser(
+                    Lexer('studio_view("../outside", "Bad", "<p>no</p>");').tokenize()
+                ).parse()
+            )
+        with self.assertRaisesRegex(RuntimeError, "100000 characters"):
+            interpreter.interpret(
+                Parser(
+                    Lexer(
+                        f'studio_view("large", "Large", "{"x" * 100001}");'
+                    ).tokenize()
+                ).parse()
+            )
+
+    def test_custom_view_apis_are_unavailable_outside_addon_mode(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "only available to Studio add-ons"):
+            run_source('studio_permission("workspace.read");')
 
     def test_rejects_duplicate_command_ids(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "Duplicate Studio command ID"):

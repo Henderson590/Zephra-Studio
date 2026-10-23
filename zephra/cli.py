@@ -46,7 +46,16 @@ def run_studio_addon(path: Path, config: ZephraConfig, verbose: bool) -> None:
         raise FileNotFoundError(f"File not found: {path}")
 
     _run_source(source, str(path), interpreter)
-    print("__ZEPHRA_STUDIO_COMMANDS__" + json.dumps(interpreter.studio_commands))
+    print(
+        "__ZEPHRA_STUDIO_COMMANDS__"
+        + json.dumps(
+            {
+                "commands": interpreter.studio_commands,
+                "views": interpreter.studio_views,
+                "permissions": interpreter.studio_permissions,
+            }
+        )
+    )
 
 
 def repl(config: ZephraConfig, verbose: bool) -> None:

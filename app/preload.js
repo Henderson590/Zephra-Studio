@@ -86,6 +86,17 @@ const api = {
     unwatch: (path) => ipcRenderer.invoke("fs.unwatch", path),
     openPath: (path) => ipcRenderer.invoke("shell.openPath", path),
   },
+  addonApi: {
+    workspaceRead: (root, relativePath) =>
+      ipcRenderer.invoke("addonApi.workspace.read", root, relativePath),
+    workspaceWrite: (root, relativePath, contents) =>
+      ipcRenderer.invoke(
+        "addonApi.workspace.write",
+        root,
+        relativePath,
+        contents,
+      ),
+  },
   runner: {
     run: (options) => ipcRenderer.invoke("run.script", options),
     stop: (id) => ipcRenderer.invoke("run.stop", id),

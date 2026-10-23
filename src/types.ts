@@ -56,8 +56,14 @@ export type StudioAddon = {
 export type StudioAddonCommand = {
   id: string;
   label: string;
-  action: "notify" | "insert_text" | "run_current_file";
+  action: "notify" | "insert_text" | "run_current_file" | "open_view";
   value: string;
+};
+
+export type StudioAddonView = {
+  id: string;
+  label: string;
+  html: string;
 };
 
 export type LanguageTool = {

@@ -1,11 +1,16 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../api/ipc";
-import { StudioAddon, StudioAddonCommand } from "../types";
+import { StudioAddon, StudioAddonCommand, StudioAddonView } from "../types";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onCommandsLoaded: (addonName: string, commands: StudioAddonCommand[]) => void;
+  onCommandsLoaded: (
+    addonName: string,
+    commands: StudioAddonCommand[],
+    views: StudioAddonView[],
+    grantedPermissions: string[],
+  ) => void;
   onRunAddon: (addonPath: string) => void;
 };
 
@@ -72,7 +77,7 @@ export default function AddonManager({
   const loadAddon = async (addon: StudioAddon) => {
     if (
       !window.confirm(
-        `Load ${addon.name} in the restricted .zph add-on runtime? Add-ons can use the editor command API, but file access, imports, and system shell access are disabled. The runtime has execution and output limits.`,
+        `Load ${addon.name} in the restricted .zph add-on runtime? Imports and direct filesystem/system access remain disabled. The add-on can declare isolated custom views and request specific mediated IDE capabilities for your approval.`,
       )
     ) {
       return;
@@ -85,13 +90,25 @@ export default function AddonManager({
       if (!result?.success)
         throw new Error(result?.error || "The add-on could not be loaded.");
       const commands = Array.isArray(result.commands) ? result.commands : [];
-      onCommandsLoaded(addon.name, commands);
+      const views = Array.isArray(result.views) ? result.views : [];
+      const permissions = Array.isArray(result.permissions)
+        ? result.permissions
+        : [];
+      const grantedPermissions =
+        permissions.length > 0
+          ? window.confirm(
+              `${addon.name} requests these IDE capabilities:\n\n${permissions.map((permission: string) => `• ${permission}`).join("\n")}\n\nApprove only if you trust this add-on. Workspace file permissions are limited to the currently open workspace.`,
+            )
+            ? permissions
+            : []
+          : [];
+      onCommandsLoaded(addon.name, commands, views, grantedPermissions);
       setLoaded((current) =>
         current.includes(addon.path) ? current : [...current, addon.path],
       );
       setStatus(
-        commands.length
-          ? `${addon.name} loaded with ${commands.length} editor command${commands.length === 1 ? "" : "s"}.`
+        commands.length || views.length
+          ? `${addon.name} loaded with ${commands.length} command${commands.length === 1 ? "" : "s"} and ${views.length} custom view${views.length === 1 ? "" : "s"}.`
           : `${addon.name} ran successfully and registered no editor commands.`,
       );
       if (result.output) setStatus((current) => `${current}\n${result.output}`);
@@ -114,8 +131,9 @@ export default function AddonManager({
           <div>
             <h2>Add-ons</h2>
             <p>
-              Add-ons run in a restricted Zephra runtime. File access, imports,
-              and shell capabilities are disabled.
+              Add-ons run in a restricted Zephra runtime. Imports and direct
+              filesystem/shell access are disabled; limited APIs require
+              permission approval.
             </p>
           </div>
           <button
@@ -150,7 +168,7 @@ export default function AddonManager({
                   onClick={() => {
                     if (
                       window.confirm(
-                        `Run ${addon.name} in the restricted .zph add-on runtime? File access, imports, and system shell access are disabled.`,
+                        `Run ${addon.name} in the restricted .zph add-on runtime? Imports and direct filesystem/system access are disabled.`,
                       )
                     ) {
                       onRunAddon(addon.path);

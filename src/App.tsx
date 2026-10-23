@@ -16,6 +16,7 @@ import {
   FileTab,
   RunOutput,
   StudioAddonCommand,
+  StudioAddonView as StudioAddonViewData,
   WorkspaceSnapshot,
   WorkspaceSession,
 } from "./types";
@@ -23,6 +24,7 @@ import CommandPalette, { Command } from "./components/CommandPalette";
 import SearchPanel from "./components/SearchPanel";
 import ZephraLab from "./components/ZephraLab";
 import AddonManager from "./components/AddonManager";
+import StudioAddonView from "./components/StudioAddonView";
 import MinecraftDev from "./components/MinecraftDev";
 import LanguageTools from "./components/LanguageTools";
 import FileExplorer from "./components/FileExplorer";
@@ -109,6 +111,20 @@ export default function App() {
   const [addonCommands, setAddonCommands] = useState<
     Array<StudioAddonCommand & { addonName: string }>
   >([]);
+  const [addonViews, setAddonViews] = useState<
+    Array<{
+      addonName: string;
+      view: StudioAddonViewData;
+      permissions: string[];
+      grantedRoot: string | null;
+    }>
+  >([]);
+  const [activeAddonView, setActiveAddonView] = useState<{
+    addonName: string;
+    view: StudioAddonViewData;
+    permissions: string[];
+    grantedRoot: string | null;
+  } | null>(null);
   const [recentProjects, setRecentProjects] = useState<string[]>([]);
   const [gitBranch, setGitBranch] = useState<string | null>(null);
   const [gitDirty, setGitDirty] = useState(false);
@@ -846,7 +862,12 @@ export default function App() {
   );
 
   const registerAddonCommands = useCallback(
-    (addonName: string, registered: StudioAddonCommand[]) => {
+    (
+      addonName: string,
+      registered: StudioAddonCommand[],
+      registeredViews: StudioAddonViewData[],
+      grantedPermissions: string[],
+    ) => {
       const commands = registered.map((command) => ({
         ...command,
         id: `addon:${addonName}:${command.id}`,
@@ -856,12 +877,21 @@ export default function App() {
         ...previous.filter((command) => command.addonName !== addonName),
         ...commands,
       ]);
+      setAddonViews((previous) => [
+        ...previous.filter((item) => item.addonName !== addonName),
+        ...registeredViews.map((view) => ({
+          addonName,
+          view,
+          permissions: grantedPermissions,
+          grantedRoot: workspaceRoot,
+        })),
+      ]);
     },
-    [],
+    [workspaceRoot],
   );
 
   const executeAddonCommand = useCallback(
-    (command: StudioAddonCommand) => {
+    (command: StudioAddonCommand & { addonName: string }) => {
       if (command.action === "notify") {
         setIsTerminalOpen(false);
         setRightPanel("output");
@@ -886,10 +916,33 @@ export default function App() {
         editor.focus();
         return;
       }
+      if (command.action === "open_view") {
+        const registeredView = addonViews.find(
+          (item) =>
+            item.addonName === command.addonName &&
+            item.view.id === command.value,
+        );
+        if (registeredView) setActiveAddonView(registeredView);
+        return;
+      }
       void runCurrentFile();
     },
-    [runCurrentFile],
+    [addonViews, runCurrentFile],
   );
+
+  const notifyFromAddonView = useCallback((message: string) => {
+    setIsTerminalOpen(false);
+    setRightPanel("output");
+    setIsOutputOpen(true);
+    setRunOutput((previous) => [
+      ...previous,
+      {
+        id: `addon-view-${Date.now()}`,
+        type: "stdout",
+        data: `${message}\n`,
+      },
+    ]);
+  }, []);
 
   const requestNewFile = useCallback(() => {
     setSidePanel("explorer");
@@ -2261,6 +2314,17 @@ export default function App() {
         onCommandsLoaded={registerAddonCommands}
         onRunAddon={runAddon}
       />
+      {activeAddonView && (
+        <StudioAddonView
+          addonName={activeAddonView.addonName}
+          view={activeAddonView.view}
+          rootPath={workspaceRoot}
+          grantedRoot={activeAddonView.grantedRoot}
+          permissions={activeAddonView.permissions}
+          onClose={() => setActiveAddonView(null)}
+          onNotify={notifyFromAddonView}
+        />
+      )}
       <VSCodeExtensionManager
         open={vsixManagerOpen}
         onClose={() => setVsixManagerOpen(false)}

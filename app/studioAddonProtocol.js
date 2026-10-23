@@ -4,7 +4,20 @@ const MAX_COMMAND_ID_LENGTH = 80;
 const MAX_COMMAND_LABEL_LENGTH = 100;
 const MAX_COMMAND_VALUE_LENGTH = 10000;
 const COMMAND_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const COMMAND_ACTIONS = new Set(["notify", "insert_text", "run_current_file"]);
+const COMMAND_ACTIONS = new Set([
+  "notify",
+  "insert_text",
+  "run_current_file",
+  "open_view",
+]);
+const ADDON_PERMISSIONS = new Set([
+  "workspace.info",
+  "workspace.read",
+  "workspace.write",
+  "ui.notify",
+]);
+const MAX_ADDON_VIEWS = 10;
+const MAX_ADDON_VIEW_HTML_LENGTH = 100_000;
 
 function validateStudioAddonCommands(commands) {
   if (!Array.isArray(commands)) return "Add-on command list must be an array.";
@@ -51,9 +64,69 @@ function validateStudioAddonCommands(commands) {
   return null;
 }
 
+function validateStudioAddonResult(addonData) {
+  if (
+    !addonData ||
+    typeof addonData !== "object" ||
+    Array.isArray(addonData) ||
+    !Array.isArray(addonData.commands) ||
+    !Array.isArray(addonData.views) ||
+    !Array.isArray(addonData.permissions)
+  ) {
+    return "Add-on response has an invalid shape.";
+  }
+
+  const commandError = validateStudioAddonCommands(addonData.commands);
+  if (commandError) return commandError;
+  const { commands, views, permissions } = addonData;
+  if (
+    views.length > MAX_ADDON_VIEWS ||
+    views.some(
+      (view) =>
+        !view ||
+        typeof view !== "object" ||
+        Array.isArray(view) ||
+        typeof view.id !== "string" ||
+        !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(view.id) ||
+        typeof view.label !== "string" ||
+        view.label.trim().length === 0 ||
+        view.label.length > 100 ||
+        typeof view.html !== "string" ||
+        view.html.length > MAX_ADDON_VIEW_HTML_LENGTH,
+    ) ||
+    new Set(views.map((view) => view.id)).size !== views.length
+  ) {
+    return "Add-on view data is invalid or exceeds its limits.";
+  }
+  if (
+    permissions.length > ADDON_PERMISSIONS.size ||
+    permissions.some(
+      (permission) =>
+        typeof permission !== "string" || !ADDON_PERMISSIONS.has(permission),
+    ) ||
+    new Set(permissions).size !== permissions.length
+  ) {
+    return "Add-on permission request is invalid.";
+  }
+  const viewIds = new Set(views.map((view) => view.id));
+  if (
+    commands.some(
+      (command) =>
+        command.action === "open_view" && !viewIds.has(command.value),
+    )
+  ) {
+    return "Add-on command references an unknown view.";
+  }
+  return null;
+}
+
 module.exports = {
+  ADDON_PERMISSIONS,
   COMMAND_ACTIONS,
   MAX_ADDON_COMMANDS,
   MAX_ADDON_OUTPUT_BYTES,
+  MAX_ADDON_VIEW_HTML_LENGTH,
+  MAX_ADDON_VIEWS,
   validateStudioAddonCommands,
+  validateStudioAddonResult,
 };

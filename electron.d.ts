@@ -283,6 +283,17 @@ declare global {
         unwatch: (path: string) => Promise<any>;
         openPath: (path: string) => Promise<any>;
       };
+      addonApi: {
+        workspaceRead: (
+          root: string,
+          relativePath: string,
+        ) => Promise<{ data: string } | { error: string }>;
+        workspaceWrite: (
+          root: string,
+          relativePath: string,
+          contents: string,
+        ) => Promise<{ success: true } | { error: string }>;
+      };
       runner: {
         run: (options: {
           path: string;

@@ -50,8 +50,12 @@ const {
 } = require("./projectSnapshots");
 const {
   MAX_ADDON_OUTPUT_BYTES,
-  validateStudioAddonCommands,
+  validateStudioAddonResult,
 } = require("./studioAddonProtocol");
+const {
+  readWorkspaceFile: readAddonWorkspaceFile,
+  writeWorkspaceFile: writeAddonWorkspaceFile,
+} = require("./addonWorkspaceApi");
 
 const isDev =
   process.env.NODE_ENV === "development" || process.env.ELECTRON_DEV;
@@ -104,6 +108,16 @@ function createWindow() {
       nodeIntegration: false,
       enableRemoteModule: false,
     },
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  mainWindow.webContents.on("will-frame-navigate", (details) => {
+    if (!details.isMainFrame && details.url !== "about:srcdoc") {
+      details.preventDefault();
+    }
+  });
+  mainWindow.webContents.on("will-redirect", (details) => {
+    if (!details.isMainFrame) details.preventDefault();
   });
 
   mainWindow.once("ready-to-show", () => {
@@ -1433,17 +1447,22 @@ ipcMain.handle("extensions.load", async (event, addonPath) => {
       }
 
       try {
-        const commands = JSON.parse(
+        const addonData = JSON.parse(
           outputLines[commandLineIndex].slice(
             "__ZEPHRA_STUDIO_COMMANDS__".length,
           ),
         );
-        const commandError = validateStudioAddonCommands(commands);
-        if (commandError) throw new Error(commandError);
+        const resultError = validateStudioAddonResult(addonData);
+        if (resultError) throw new Error(resultError);
+        const commands = addonData.commands;
+        const views = addonData.views;
+        const permissions = addonData.permissions;
         outputLines.splice(commandLineIndex, 1);
         finish({
           success: true,
           commands,
+          views,
+          permissions,
           output: outputLines.join("\n").trim(),
         });
       } catch (error) {
@@ -1455,6 +1474,47 @@ ipcMain.handle("extensions.load", async (event, addonPath) => {
     });
   });
 });
+
+ipcMain.handle(
+  "addonApi.workspace.read",
+  async (event, rootPath, relativePath) => {
+    try {
+      if (
+        event.sender !== mainWindow?.webContents ||
+        event.senderFrame !== event.sender.mainFrame
+      ) {
+        throw new Error(
+          "Add-on workspace APIs are available only through the Studio main frame.",
+        );
+      }
+      const root = await resolveWorkspaceDirectory(rootPath);
+      const data = await readAddonWorkspaceFile(root, relativePath);
+      return { data };
+    } catch (error) {
+      return { error: String(error) };
+    }
+  },
+);
+
+ipcMain.handle(
+  "addonApi.workspace.write",
+  async (event, rootPath, relativePath, contents) => {
+    try {
+      if (
+        event.sender !== mainWindow?.webContents ||
+        event.senderFrame !== event.sender.mainFrame
+      ) {
+        throw new Error(
+          "Add-on workspace APIs are available only through the Studio main frame.",
+        );
+      }
+      const root = await resolveWorkspaceDirectory(rootPath);
+      return await writeAddonWorkspaceFile(root, relativePath, contents);
+    } catch (error) {
+      return { error: String(error) };
+    }
+  },
+);
 
 ipcMain.handle("search.query", async (event, params) => {
   const { root, query } = params;

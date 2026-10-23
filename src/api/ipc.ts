@@ -73,6 +73,10 @@ const api = (window as any).zephraStudio || {
     unwatch: () => createMissingApiError(),
     openPath: () => createMissingApiError(),
   },
+  addonApi: {
+    workspaceRead: () => createMissingApiError(),
+    workspaceWrite: () => createMissingApiError(),
+  },
   runner: {
     run: () => createMissingApiError(),
     stop: () => createMissingApiError(),

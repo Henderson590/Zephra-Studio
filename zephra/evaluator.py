@@ -148,6 +148,8 @@ class Interpreter:
         self.call_stack: List[str] = []
         self.module_cache: Dict[str, Any] = {}
         self.studio_commands: List[Dict[str, str]] = []
+        self.studio_views: List[Dict[str, str]] = []
+        self.studio_permissions: List[str] = []
         self.sandboxed = sandboxed
         self.step_limit = step_limit
         self.execution_steps = 0
@@ -220,6 +222,47 @@ class Interpreter:
                 ),
             )
         self.register_builtin("studio_command", self._register_studio_command, 4)
+        self.register_builtin("studio_permission", self._register_studio_permission, 1)
+        self.register_builtin("studio_view", self._register_studio_view, 3)
+
+    def _register_studio_permission(self, permission: Any) -> None:
+        allowed = {"workspace.info", "workspace.read", "workspace.write", "ui.notify"}
+        if not self.sandboxed:
+            raise RuntimeError("studio_permission is only available to Studio add-ons.")
+        if not isinstance(permission, str) or permission not in allowed:
+            raise RuntimeError("Unsupported Studio add-on permission.")
+        if permission not in self.studio_permissions:
+            self.studio_permissions.append(permission)
+
+    def _register_studio_view(self, view_id: Any, label: Any, html: Any) -> None:
+        if not self.sandboxed:
+            raise RuntimeError("studio_view is only available to Studio add-ons.")
+        if not all(isinstance(item, str) for item in (view_id, label, html)):
+            raise RuntimeError("studio_view expects three string arguments.")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", view_id):
+            raise RuntimeError("Studio view ID must use up to 80 letters, numbers, periods, underscores, or hyphens.")
+        if not label.strip() or len(label) > 100:
+            raise RuntimeError("Studio view label must contain 1 to 100 characters.")
+        if len(html) > 100_000:
+            raise RuntimeError("Studio view HTML cannot exceed 100000 characters.")
+        if len(self.studio_views) >= 10:
+            raise RuntimeError("An add-on cannot register more than 10 views.")
+        if any(view["id"] == view_id for view in self.studio_views):
+            raise RuntimeError(f"Duplicate Studio view ID '{view_id}'.")
+        command_id = f"view.{view_id}"
+        if len(self.studio_commands) >= 100:
+            raise RuntimeError("An add-on cannot register more than 100 commands.")
+        if any(command["id"] == command_id for command in self.studio_commands):
+            raise RuntimeError(f"Duplicate Studio command ID '{command_id}'.")
+        self.studio_views.append({"id": view_id, "label": label, "html": html})
+        self.studio_commands.append(
+            {
+                "id": command_id,
+                "label": f"Open {label}",
+                "action": "open_view",
+                "value": view_id,
+            }
+        )
 
     def _register_studio_command(self, command_id: Any, label: Any, action: Any, value: Any) -> None:
         if not all(isinstance(item, str) for item in (command_id, label, action, value)):

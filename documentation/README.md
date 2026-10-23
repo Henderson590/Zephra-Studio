@@ -346,23 +346,28 @@ hello-tools.zph
 The file typically contains:
 
 1. Optional comments describing the add-on.
-2. One or more `studio_command(...)` declarations at top level.
-3. Optional functions and ordinary Zephra statements.
-4. Optional calls that run the add-on's own logic when it is loaded or run.
+2. Optional `studio_permission(...)` declarations.
+3. Optional `studio_view(...)` declarations.
+4. One or more `studio_command(...)` declarations at top level.
+5. Optional functions and ordinary Zephra statements.
+6. Optional calls that run the add-on's own logic when it is loaded or run.
 
 There is no install-time build step. Use the `.zph` extension and valid Zephra
-syntax. Keep all code in the selected file; imports and filesystem access are
-not available to the restricted add-on runtime.
+syntax. Keep all code in the selected file. Imports and direct filesystem
+operations remain disabled in the restricted runtime; workspace files are
+available only through the mediated APIs listed below and only after the
+specific permission is approved.
 
 ### Creating an add-on
 
 1. Create a new `.zph` file in the editor or another text editor.
-2. Add a unique command ID, visible label, supported action, and action value.
+2. Add unique command IDs and labels; optionally declare permissions and views.
 3. Save the file.
 4. Open **Add-ons** → **Install .zph Add-on** and choose the file. Or copy it
    into the add-ons directory opened by **Open Add-ons Folder**.
 5. Choose **Load** to execute it in the restricted runtime and register its
-   commands. Zephra Studio asks for confirmation first.
+   commands. Zephra Studio asks for confirmation first and separately asks
+   before granting any requested capabilities.
 6. Press `Ctrl+Shift+P`, search for the command label, and select it.
 
 The bundled `addons/hello.zph` can also be loaded as an example. The user
@@ -396,6 +401,30 @@ studio_command(
   "Run the active file",
   "run_current_file",
   ""
+);
+
+studio_permission("workspace.read");
+studio_permission("ui.notify");
+
+studio_view(
+  "readme-view",
+  "Workspace README",
+  "<main><h1>Workspace README</h1><button id=\"read\">Read README.md</button><pre id=\"output\"></pre><script>
+let requestId = 0;
+window.addEventListener(\"message\", event => {
+  if (event.data?.channel !== \"zephra-studio-host\") return;
+  document.querySelector(\"#output\").textContent =
+    event.data.error || event.data.result || \"(empty)\";
+});
+document.querySelector(\"#read\").addEventListener(\"click\", () => {
+  parent.postMessage({
+    channel: \"zephra-studio-addon\",
+    id: String(++requestId),
+    method: \"workspace.readFile\",
+    path: \"README.md\"
+  }, \"*\");
+});
+</script></main>"
 );
 
 func main() {
@@ -442,13 +471,77 @@ These are the only add-on command actions. Add-ons cannot define arbitrary
 JavaScript callbacks, UI panels, menu contributions, background services, or
 new host API calls.
 
+`studio_view(view_id, label, html)` registers an isolated custom interface and
+automatically creates an **Open <label>** command. Each add-on may register at
+most 10 views; IDs follow the same format as command IDs, labels are limited
+to 100 characters, and HTML is limited to 100,000 characters.
+
+The view's HTML is rendered inside an iframe with `sandbox="allow-scripts"` and
+an opaque origin. Inline HTML, CSS, and JavaScript are permitted, but network
+connections, external scripts, parent DOM access, navigation, forms, and
+plugins are blocked by the view's Content Security Policy and iframe sandbox.
+The only way for the view to call the IDE is the mediated `postMessage` API.
+
+Use this request shape from the view:
+
+```javascript
+parent.postMessage(
+  {
+    channel: "zephra-studio-addon",
+    id: "unique-request-id",
+    method: "workspace.readFile",
+    path: "README.md",
+  },
+  "*",
+);
+
+window.addEventListener("message", (event) => {
+  if (event.data?.channel !== "zephra-studio-host") return;
+  if (event.data.error) {
+    // Display the error returned by the host.
+    return;
+  }
+  // Consume event.data.result.
+});
+```
+
+Responses contain the matching `id` and either `result` or `error`. The host
+accepts messages only from the add-on's own iframe, enforces the permission
+grant and request limits, and rejects unknown API methods.
+
+### IDE permissions and API methods
+
+Declare capabilities by calling `studio_permission(permission)` in the `.zph`
+file. Zephra Studio displays the requested permissions after running the file
+in the restricted interpreter. Approvals are held for the current loaded
+add-on session; rejecting a permission leaves the view/commands registered,
+but calls requiring that permission return an error. Workspace access is tied
+to the workspace open when the add-on was loaded. Reload the add-on after
+changing workspaces to request access to the new workspace.
+
+| Permission        | View API method       | Function                                                | Limits                                                                  |
+| ----------------- | --------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `workspace.info`  | `workspace.getRoot`   | Returns the path of the approved open workspace         | Only the approved workspace                                             |
+| `workspace.read`  | `workspace.readFile`  | Reads a UTF-8 text file using a workspace-relative path | 1 MB per file; symlinks are rejected                                    |
+| `workspace.write` | `workspace.writeFile` | Writes UTF-8 text using a workspace-relative path       | 1 MB per file; parent folders must already exist; symlinks are rejected |
+| `ui.notify`       | `ui.notify`           | Writes a message to Zephra Studio's Output panel        | 10,000 characters                                                       |
+
+Workspace paths cannot be absolute or traverse outside the workspace. File
+read/write does not expose general filesystem access, directory enumeration,
+process execution, network access, or arbitrary calls to the renderer's IPC
+API. The view bridge is limited to 60 requests per minute. New IDE APIs must
+be deliberately added to the permission list and host bridge; add-ons cannot
+invoke arbitrary IDE functions.
+
 ### Add-on runtime and trust
 
 Add-ons execute as a separate Python process using the restricted Zephra
 interpreter mode. The host limits source files to 1 MB, runtime to 15 seconds,
-captured output to 1 MB, and registered commands to 100. The interpreter
-restricts imports, file/system built-ins, object-property access, large values,
-and execution steps.
+captured output to 1 MB, and registered commands to 100. The interpreter restricts imports, direct file/system built-ins,
+object-property access, large values, and execution steps. Workspace file
+access and IDE notifications are exposed only through the limited bridge
+described above after explicit user approval. Custom views use a sandboxed
+iframe with a restrictive content policy.
 
 This is defense in depth, **not a hard operating-system sandbox**. A
 vulnerability in the interpreter, its dependencies, or the host process could
