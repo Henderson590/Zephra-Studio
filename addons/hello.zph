@@ -1,0 +1,12 @@
+// Zephra Studio add-on example.
+// Load this file from Add-ons to register commands in the command palette.
+
+studio_command("hello.greet", "Show a greeting", "notify", "Hello from a Zephra Studio add-on!");
+studio_command("hello.insert-comment", "Insert a comment", "insert_text", "// Added by the Hello add-on");
+
+func main() {
+  print("Hello from Zephra Code!");
+}
+
+main();
+

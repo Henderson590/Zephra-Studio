@@ -1,0 +1,650 @@
+:root {
+  --bg: #0f1119;
+  --panel: #121827;
+  --text: #e5e7eb;
+  --muted: rgba(229, 231, 235, 0.7);
+  --accent: #60a5fa;
+  --border: rgba(148, 163, 184, 0.25);
+  --highlight: rgba(96, 165, 250, 0.15);
+  --danger: #f87171;
+  --success: #34d399;
+}
+
+.theme-light {
+  --bg: #fafafa;
+  --panel: #ffffff;
+  --text: #0f172a;
+  --muted: rgba(15, 23, 42, 0.7);
+  --accent: #2563eb;
+  --border: rgba(148, 163, 184, 0.5);
+  --highlight: rgba(37, 99, 235, 0.12);
+  --danger: #ef4444;
+  --success: #10b981;
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+.app {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* Ensure the split container expands to fill remaining space below the toolbar */
+.split {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.split > div {
+  min-height: 0;
+  min-width: 0;
+}
+
+.toolbar {
+  height: 42px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.toolbar-button {
+  border: 1px solid var(--border);
+  background: transparent;
+  padding: 5px 10px;
+  margin-right: 8px;
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.toolbar-button:hover {
+  background: var(--highlight);
+}
+
+.toolbar-button:disabled,
+.primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+}
+
+.sidebar {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.welcome {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.welcome-content {
+  text-align: center;
+  max-width: 320px;
+}
+
+.welcome-content h2 {
+  margin-top: 0;
+}
+
+.primary {
+  background: var(--accent);
+  border: 1px solid transparent;
+  padding: 8px 14px;
+  border-radius: 5px;
+  color: white;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.primary:hover {
+  opacity: 0.9;
+}
+
+.recent {
+  text-align: left;
+  margin-top: 16px;
+}
+
+.recent ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.recent li {
+  margin: 6px 0;
+}
+
+.link {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.main-area {
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.editor-pane {
+  flex: 1 1 auto;
+  height: auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  min-height: 0;
+}
+
+.output-wrapper {
+  flex: 0 0 220px;
+  min-height: 0;
+}
+
+.tab-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--panel);
+}
+
+.editor-container {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.tab-bar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  padding: 0 8px;
+  background: var(--panel);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 6px 8px;
+  margin-right: 4px;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  color: var(--text);
+  position: relative;
+}
+
+.tab-label-button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tab-close {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: 8px;
+  line-height: 1;
+}
+
+.tab-close:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-bottom: none;
+}
+
+.tab-spacer {
+  flex: 1;
+}
+
+.tab-action {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  padding: 6px;
+  cursor: pointer;
+}
+
+.no-file {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: var(--muted);
+}
+
+/* Split gutter styling (react-split) */
+.gutter {
+  background: rgba(148, 163, 184, 0.15);
+  cursor: col-resize;
+}
+
+.gutter.gutter-vertical {
+  cursor: row-resize;
+}
+
+.status-bar {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  padding: 0 10px;
+  background: var(--panel);
+  font-size: 12px;
+}
+
+.status-item {
+  margin: 0 8px;
+  color: var(--muted);
+}
+
+.output-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+
+.output-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.output-actions button {
+  margin-left: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.output-body {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.output-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.output-stdout {
+  color: var(--text);
+}
+
+.output-stderr {
+  color: var(--danger);
+}
+
+.output-meta {
+  color: var(--muted);
+}
+
+.command-palette-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 120px;
+  z-index: 1000;
+}
+
+.command-palette {
+  width: min(680px, 90%);
+  background: var(--panel);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.command-palette-input {
+  width: 100%;
+  border: none;
+  padding: 14px 14px;
+  font-size: 16px;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.command-palette-list {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.command-palette-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+.command-palette-item:hover {
+  background: var(--highlight);
+}
+
+.command-palette-item-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.command-palette-item-subtitle {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.command-palette-empty {
+  padding: 14px;
+  color: var(--muted);
+}
+
+.file-explorer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.explorer-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.explorer-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.explorer-body {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 6px 12px;
+}
+
+.explorer-node {
+  margin-bottom: 2px;
+}
+
+.explorer-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.explorer-item.active {
+  background: var(--highlight);
+}
+
+.explorer-toggle {
+  font-size: 10px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.explorer-label {
+  flex: 1;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.explorer-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.icon-button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.icon-button:hover {
+  background: var(--highlight);
+  color: var(--text);
+}
+
+.explorer-footer {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.explorer-create {
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.explorer-create input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.explorer-create-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.explorer-error {
+  color: var(--danger);
+  padding: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.addon-manager {
+  width: min(760px, 92%);
+}
+
+.addon-manager-header,
+.addon-manager-toolbar,
+.addon-card,
+.addon-card-actions {
+  display: flex;
+  align-items: center;
+}
+
+.addon-manager-header {
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.addon-manager-header h2,
+.addon-manager-header p {
+  margin: 0;
+}
+
+.addon-manager-header p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.addon-manager-close {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 22px;
+}
+
+.addon-manager-toolbar {
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.addon-manager-list {
+  max-height: min(55vh, 480px);
+  overflow: auto;
+  padding: 8px 16px 16px;
+}
+
+.addon-card {
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.addon-card-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.addon-card-info span,
+.addon-card-info code,
+.addon-manager-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.addon-card-info code {
+  overflow-wrap: anywhere;
+}
+
+.addon-card-actions {
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.addon-manager-message {
+  margin: 8px 16px;
+  color: var(--accent);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.addon-manager-message.error {
+  color: var(--danger);
+}
+
+.addon-manager-empty {
+  padding: 16px 0;
+}
+
+@media (max-width: 760px) {
+  .toolbar-right {
+    display: none;
+  }
+
+  .toolbar {
+    overflow-x: auto;
+  }
+
+  .addon-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "name": "zephra-studio",
+  "productName": "Zephra Studio",
+  "version": "0.1.0",
+  "description": "A modern IDE for the Zephra programming language with multi-language support.",
+  "main": "app/main.js",
+  "author": "Zephra Studio",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail \"npm:dev:electron\" \"npm:dev:vite\"",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "prebuild": "node scripts/generate-icons.js",
+    "build": "npm run build:renderer && npm run build:electron",
+    "build:renderer": "vite build",
+    "build:electron": "electron-builder --win --x64",
+    "start": "electron .",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write \"{src,app,addons}/**/*.{ts,tsx,js,jsx,json,md}\"",
+    "test": "python -m unittest discover -s tests"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.4.6",
+    "chokidar": "^3.5.3",
+    "classnames": "^2.3.2",
+    "electron-store": "^8.1.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-hotkeys-hook": "^4.3.2",
+    "react-split": "^2.0.14"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.2",
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "@vitejs/plugin-react": "^4.2.0",
+    "concurrently": "^8.2.0",
+    "electron": "^26.3.3",
+    "electron-builder": "^24.6.2",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.34.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.4.2",
+    "vite": "^5.1.1",
+    "wait-on": "^7.0.1"
+  },
+  "build": {
+    "appId": "com.zephra.studio",
+    "productName": "Zephra Studio",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "icon": "build/icon",
+    "files": [
+      "app/**/*",
+      "dist/**",
+      "zephra/**",
+      "addons/**",
+      "package.json"
+    ],
+    "asarUnpack": ["zephra/**", "addons/**"],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
